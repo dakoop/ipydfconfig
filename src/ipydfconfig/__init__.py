@@ -78,18 +78,14 @@ class IpyDfConfigMagics(Magics):
         return args
 
     def expand_shortcuts(self, config_kwargs, prefix):
-        new_kwargs = {}
-        old_kwargs = []
+        expanded_kwargs = {}
         for key, value in config_kwargs.items():
             if key in self.shortcuts and prefix in self.shortcuts[key]:
                 for exp_key in self.shortcuts[key][prefix]:
-                    new_kwargs[exp_key] = value
-                old_kwargs.append(key)
-        for k in old_kwargs:
-            config_kwargs.pop(k)
-        for k, v in new_kwargs.items():
-            config_kwargs[k] = v
-        return config_kwargs
+                    expanded_kwargs[exp_key] = value
+            else:
+                expanded_kwargs[key] = value
+        return expanded_kwargs
 
     @cell_magic
     def dfconfig(self, line, cell):
@@ -102,14 +98,12 @@ class IpyDfConfigMagics(Magics):
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", IpyDfConfigWarning)
                 self.set_pdconfig(cell, expanded_kwargs)
-        elif self.has_lib("polars"):
+        if self.has_lib("polars"):
             expanded_kwargs = self.expand_shortcuts(config_kwargs, "pl")
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", IpyDfConfigWarning)
                 self.set_plconfig(cell, expanded_kwargs)
-        else:
-            ip = get_ipython()
-            ip.run_cell(cell)
+        get_ipython().run_cell(cell)
 
     @cell_magic
     def plconfig(self, line, cell):
@@ -119,11 +113,11 @@ class IpyDfConfigMagics(Magics):
             return
 
         self.set_plconfig(cell, expanded_kwargs)
+        get_ipython().run_cell(cell)
 
     def set_plconfig(self, cell, config_kwargs):
         pl = self.get_lib("polars", force_load=True)
-        ip = get_ipython()
-        exec_count = ip.execution_count
+        exec_count = get_ipython().execution_count
 
         saved_state = pl.Config.save()
         self._plconfig_states[exec_count] = saved_state
@@ -134,8 +128,6 @@ class IpyDfConfigMagics(Magics):
             else:
                 warnings.warn(f"Invalid polars option: {key}", IpyDfConfigWarning)
 
-        ip.run_cell(cell)
-
     @cell_magic
     def pdconfig(self, line, cell):
         config_kwargs = self.parse_args(line)
@@ -144,11 +136,11 @@ class IpyDfConfigMagics(Magics):
             return
 
         self.set_pdconfig(cell, expanded_kwargs)
+        get_ipython().run_cell(cell)
 
     def set_pdconfig(self, cell, config_kwargs):
         pd = self.get_lib("pandas", force_load=True)
-        ip = get_ipython()
-        exec_count = ip.execution_count
+        exec_count = get_ipython().execution_count
         saved_state = json.dumps(flatten_options(pd.options.d))
         self._pdconfig_states[exec_count] = saved_state
 
@@ -157,8 +149,6 @@ class IpyDfConfigMagics(Magics):
                 pd.set_option(key, val)
             except pd.errors.OptionError:
                 warnings.warn(f"Invalid pandas option: {key}", IpyDfConfigWarning)
-
-        ip.run_cell(cell)
 
     def _restore_pdconfig_after_cell_hook(self):
         def _restore_pdconfig_after_cell(result):
