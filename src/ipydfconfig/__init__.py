@@ -33,6 +33,10 @@ def flatten_options(d, prefix=""):
     return flat
 
 
+class IpyDfConfigWarning(UserWarning):
+    pass
+
+
 @magics_class
 class IpyDfConfigMagics(Magics):
     def __init__(self, shell):
@@ -95,10 +99,14 @@ class IpyDfConfigMagics(Magics):
 
         if self.has_lib("pandas"):
             expanded_kwargs = self.expand_shortcuts(config_kwargs, "pd")
-            self.set_pdconfig(cell, expanded_kwargs)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", IpyDfConfigWarning)
+                self.set_pdconfig(cell, expanded_kwargs)
         elif self.has_lib("polars"):
             expanded_kwargs = self.expand_shortcuts(config_kwargs, "pl")
-            self.set_plconfig(cell, expanded_kwargs)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", IpyDfConfigWarning)
+                self.set_plconfig(cell, expanded_kwargs)
         else:
             ip = get_ipython()
             ip.run_cell(cell)
@@ -123,6 +131,8 @@ class IpyDfConfigMagics(Magics):
         for key, val in config_kwargs.items():
             if hasattr(pl.Config, f"set_{key}"):
                 getattr(pl.Config, f"set_{key}")(val)
+            else:
+                warnings.warn(f"Invalid polars option: {key}", IpyDfConfigWarning)
 
         ip.run_cell(cell)
 
@@ -143,7 +153,10 @@ class IpyDfConfigMagics(Magics):
         self._pdconfig_states[exec_count] = saved_state
 
         for key, val in config_kwargs.items():
-            pd.set_option(key, val)
+            try:
+                pd.set_option(key, val)
+            except pd.errors.OptionError:
+                warnings.warn(f"Invalid pandas option: {key}", IpyDfConfigWarning)
 
         ip.run_cell(cell)
 
