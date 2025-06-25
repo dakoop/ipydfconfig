@@ -17,7 +17,7 @@ DEFAULT_SHORTCUTS = {
     "strlen": {"pd": ["display.max_colwidth"], "pl": ["fmt_str_lengths"]},
     "listlen": {
         "pd": ["display.max_seq_items"],
-        "pl": ["fmt_table_cell_list_length"],
+        "pl": ["fmt_table_cell_list_len"],
     },
 }
 
